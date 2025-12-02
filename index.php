@@ -189,9 +189,9 @@ $allProducts = $stmtAll->fetchAll();
             </div>
             <p class="text-gray-400 text-sm mb-8 max-w-sm mx-auto">Platform fashion wanita modern dengan koleksi terlengkap dan pengalaman belanja yang menyenangkan.</p>
             <div class="flex justify-center gap-6 text-sm font-bold text-gray-500 mb-8">
-                <a href="#" class="hover:text-ls-600 transition">Instagram</a>
+                <a href="https://www.instagram.com/manchesterunited/" class="hover:text-ls-600 transition" target="_blank">Instagram</a>
                 <a href="#" class="hover:text-ls-600 transition">WhatsApp</a>
-                <a href="#" class="hover:text-ls-600 transition">Tentang Kami</a>
+                <a href="https://www.youtube.com/watch?v=JuRD8gSdmps&list=RDJuRD8gSdmps&start_radio=1" class="hover:text-ls-600 transition" target="_blank">Tentang Kami</a>
             </div>
             <p class="text-gray-300 text-xs">&copy; <?= date('Y') ?> LadyStyle Shop Project. All rights reserved.</p>
         </div>
