@@ -1,158 +1,174 @@
 <?php // products.php
 require __DIR__ . '/includes/config.php';
+require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 
-$stmt = $pdo->query('SELECT * FROM categories ORDER BY name ASC');
-$categories = $stmt->fetchAll();
+// Logika Filter Kategori
+$catId = isset($_GET['category']) ? (int)$_GET['category'] : 0;
+$search = isset($_GET['q']) ? trim($_GET['q']) : '';
 
-$selectedCategoryId = isset($_GET['category']) ? (int) $_GET['category'] : 0;
+$whereClauses = ["status = 'active'"];
 $params = [];
-$where = ' WHERE p.status = "active"';
 
-if ($selectedCategoryId > 0) {
-    $where .= ' AND p.category_id = :category_id';
-    $params['category_id'] = $selectedCategoryId;
+if ($catId > 0) {
+    $whereClauses[] = "category_id = ?";
+    $params[] = $catId;
 }
 
-$sql = 'SELECT p.*, c.name AS category_name FROM products p INNER JOIN categories c ON p.category_id = c.id' . $where . ' ORDER BY p.id DESC';
+if ($search) {
+    $whereClauses[] = "name LIKE ?";
+    $params[] = "%$search%";
+}
+
+$whereSql = implode(' AND ', $whereClauses);
+$sql = "SELECT p.*, c.name as category_name 
+        FROM products p 
+        JOIN categories c ON p.category_id = c.id 
+        WHERE $whereSql 
+        ORDER BY p.id DESC";
+
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $products = $stmt->fetchAll();
+
+// Ambil Kategori untuk Menu Filter
+$categories = $pdo->query("SELECT * FROM categories")->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <title>Koleksi Produk - LadyStyle Shop</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'ls-bg': '#fdf2f8',
-                        'ls-bg-soft': '#fee2f2',
-                        'ls-pink': '#fb7185',
-                        'ls-pink-soft': '#fecdd3',
-                        'ls-ink': '#0f172a'
-                    },
-                    boxShadow: {
-                        'ls-soft': '0 18px 45px rgba(251, 113, 133, 0.35)'
-                    },
-                    borderRadius: {
-                        '3xl': '1.75rem'
-                    }
-                }
-            }
-        };
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="/ladystyle-shop/assets/css/style.css" rel="stylesheet">
+    <title>Koleksi Eksklusif - LadyStyle</title>
+    <?php require __DIR__ . '/includes/head.php'; ?>
+    <style>
+        /* Hide scrollbar for category list */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
 </head>
-<body class="min-h-screen bg-gradient-to-b from-white via-ls-bg-soft to-white text-ls-ink">
-<div class="relative overflow-hidden">
-    <div class="pointer-events-none absolute -top-40 -left-40 h-80 w-80 rounded-full bg-ls-bg blur-3xl opacity-70"></div>
-    <div class="pointer-events-none absolute -bottom-40 -right-32 h-96 w-96 rounded-full bg-ls-bg-soft blur-3xl opacity-80"></div>
+<body class="bg-gray-50 text-gray-800 font-sans selection:bg-ls-200 selection:text-ls-900">
 
-    <header class="sticky top-0 z-20 bg-white/70 backdrop-blur-xl border-b border-pink-100/70">
-        <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-            <div class="flex items-center gap-2">
-                <div class="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-ls-pink to-rose-400 shadow-ls-soft">
-                    <span class="text-xs font-semibold tracking-widest text-white">LS</span>
-                </div>
-                <div class="leading-tight">
-                    <p class="text-sm font-semibold tracking-[0.18em] text-ls-ink/80 uppercase">LadyStyle</p>
-                    <p class="text-[11px] text-ls-ink/60">Soft & Modern Fashion Store</p>
-                </div>
-            </div>
-            <div class="hidden items-center gap-6 text-sm font-medium text-ls-ink/70 md:flex">
-                <a href="/ladystyle-shop/index.php" class="transition-colors hover:text-ls-pink">Beranda</a>
-                <a href="/ladystyle-shop/products.php" class="transition-colors text-ls-pink">Koleksi</a>
-                <a href="#filter" class="transition-colors hover:text-ls-pink">Filter</a>
-            </div>
-            <div class="flex items-center gap-2">
-                <a href="/ladystyle-shop/login.php" class="hidden rounded-full border border-pink-200 px-3 py-1.5 text-xs font-medium text-ls-ink/80 shadow-sm transition hover:border-ls-pink hover:bg-ls-pink-soft/50 md:inline-flex">
-                    Login Admin
-                </a>
-            </div>
-        </nav>
+    <?php require __DIR__ . '/includes/navbar.php'; ?>
+
+    <header class="relative pt-24 pb-12 px-4 text-center overflow-hidden">
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-r from-ls-200 to-purple-200 rounded-full blur-3xl opacity-30 -z-10 animate-pulse"></div>
+
+        <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight mb-4">
+            Koleksi <span class="text-transparent bg-clip-text bg-gradient-to-r from-ls-500 to-ls-600">Terbaru</span>
+        </h1>
+        <p class="text-gray-500 text-sm md:text-base max-w-xl mx-auto leading-relaxed">
+            Temukan gaya fashion wanita modern dengan kualitas premium. Tampil percaya diri di setiap momen spesialmu.
+        </p>
+
+        <form class="max-w-md mx-auto mt-8 relative group">
+            <input type="text" name="q" value="<?= htmlspecialchars($search) ?>" 
+                   placeholder="Cari dress, hijab, blouse..." 
+                   class="w-full px-6 py-3.5 rounded-full border border-gray-200 bg-white/80 backdrop-blur shadow-sm focus:shadow-lg focus:border-ls-300 focus:ring-4 focus:ring-ls-100 transition-all outline-none text-sm font-medium pl-12">
+            <svg class="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-ls-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </form>
     </header>
 
-    <main class="mx-auto max-w-6xl px-4 pb-16 pt-8">
-        <section class="space-y-2">
-            <p class="text-xs font-semibold tracking-[0.22em] text-ls-pink uppercase">Koleksi</p>
-            <h1 class="text-2xl font-semibold text-ls-ink sm:text-3xl">Semua produk LadyStyle</h1>
-            <p class="max-w-xl text-sm text-ls-ink/70">
-                Pilih kategori di bawah ini untuk memfilter produk. Desain lembut, warna pastel, dan nyaman dipakai untuk berbagai suasana.
-            </p>
-        </section>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+        
+        <div class="flex items-center gap-3 overflow-x-auto no-scrollbar pb-8 justify-start md:justify-center">
+            <a href="products.php" 
+               class="flex-shrink-0 px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 transform hover:-translate-y-1 
+               <?= $catId === 0 ? 'bg-gray-900 text-white shadow-lg shadow-gray-500/30' : 'bg-white text-gray-500 hover:text-gray-900 border border-gray-100 hover:shadow-md' ?>">
+               Semua
+            </a>
+            <?php foreach ($categories as $cat): ?>
+            <a href="?category=<?= $cat['id'] ?>" 
+               class="flex-shrink-0 px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 transform hover:-translate-y-1 
+               <?= $catId === $cat['id'] ? 'bg-ls-600 text-white shadow-lg shadow-ls-500/30' : 'bg-white text-gray-500 hover:text-ls-600 border border-gray-100 hover:shadow-md' ?>">
+                <?= htmlspecialchars($cat['name']) ?>
+            </a>
+            <?php endforeach; ?>
+        </div>
 
-        <section id="filter" class="mt-6 space-y-4">
-            <div class="flex flex-wrap items-center gap-2">
-                <a href="/ladystyle-shop/products.php" class="inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition
-                    <?php if ($selectedCategoryId === 0): ?>
-                        border-ls-pink bg-ls-pink-soft text-ls-ink
-                    <?php else: ?>
-                        border-pink-200 bg-white/80 text-ls-ink/70 hover:border-ls-pink hover:bg-ls-bg-soft
-                    <?php endif; ?>
-                ">
-                    Semua
-                </a>
-                <?php foreach ($categories as $category): ?>
-                    <a href="/ladystyle-shop/products.php?category=<?= (int) $category['id'] ?>" class="inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition
-                        <?php if ($selectedCategoryId === (int) $category['id']): ?>
-                            border-ls-pink bg-ls-pink-soft text-ls-ink
-                        <?php else: ?>
-                            border-pink-200 bg-white/80 text-ls-ink/70 hover:border-ls-pink hover:bg-ls-bg-soft
-                        <?php endif; ?>
-                    ">
-                        <?= e($category['name']) ?>
-                    </a>
-                <?php endforeach; ?>
-            </div>
-        </section>
-
-        <section class="mt-6">
-            <?php if (count($products) === 0): ?>
-                <div class="mt-6 rounded-3xl bg-white/90 p-6 text-sm text-ls-ink/70 shadow-md ring-1 ring-pink-100">
-                    Belum ada produk tersedia untuk kategori ini.
+        <?php if (empty($products)): ?>
+            <div class="flex flex-col items-center justify-center py-20 text-center animate-fade">
+                <div class="w-24 h-24 bg-ls-50 rounded-full flex items-center justify-center mb-6">
+                    <svg class="w-10 h-10 text-ls-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                 </div>
-            <?php else: ?>
-                <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <?php foreach ($products as $product): ?>
-                        <article class="group rounded-3xl bg-white/95 p-3 shadow-md ring-1 ring-pink-100/80 transition hover:-translate-y-1 hover:shadow-ls-soft hover:ring-ls-pink">
-                            <div class="relative overflow-hidden rounded-2xl bg-ls-bg-soft">
-                                <?php if ($product['image']): ?>
-                                    <div class="h-40 w-full bg-cover bg-center" style="background-image:url('<?= e($product['image']) ?>');"></div>
-                                <?php else: ?>
-                                    <div class="flex h-40 w-full items-center justify-center bg-[radial-gradient(circle_at_20%_20%,#fecdd3,#fee2e2)] text-xs font-medium text-ls-ink/60">
-                                        <?= e($product['category_name']) ?>
-                                    </div>
-                                <?php endif; ?>
-                                <span class="absolute left-3 top-3 rounded-full bg-white/85 px-2 py-1 text-[10px] font-medium text-ls-pink">
-                                    <?= e($product['category_name']) ?>
+                <h3 class="text-xl font-bold text-gray-800">Produk Tidak Ditemukan</h3>
+                <p class="text-gray-500 mt-2 max-w-xs mx-auto">Coba kata kunci lain atau cek kategori yang berbeda.</p>
+                <a href="products.php" class="mt-6 px-6 py-2 rounded-full bg-white border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition">Reset Filter</a>
+            </div>
+        <?php else: ?>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8">
+                <?php foreach ($products as $p): ?>
+                <div class="group relative bg-white rounded-[2rem] shadow-sm hover:shadow-xl hover:shadow-ls-500/10 transition-all duration-500 flex flex-col overflow-hidden border border-gray-50">
+                    
+                    <div class="relative w-full aspect-square overflow-hidden bg-gray-100">
+                        <div class="absolute top-4 left-4 z-10">
+                            <span class="px-3 py-1 rounded-full bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider text-gray-800 shadow-sm">
+                                <?= htmlspecialchars($p['category_name']) ?>
+                            </span>
+                        </div>
+
+                        <?php if ($p['image']): ?>
+                            <img src="<?= htmlspecialchars($p['image']) ?>" 
+                                 class="w-full h-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-110 group-hover:rotate-1" 
+                                 alt="<?= htmlspecialchars($p['name']) ?>" loading="lazy">
+                        <?php else: ?>
+                            <div class="w-full h-full flex items-center justify-center bg-gray-50 text-gray-300">
+                                <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ($p['stock'] <= 0): ?>
+                            <div class="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
+                                <span class="px-4 py-2 bg-white text-gray-900 font-bold text-xs rounded-full uppercase tracking-widest shadow-lg">Habis</span>
+                            </div>
+                        <?php elseif ($p['stock'] < 5): ?>
+                            <div class="absolute bottom-3 right-3">
+                                <span class="flex items-center gap-1 px-2 py-1 rounded-md bg-red-500/90 text-white text-[10px] font-bold backdrop-blur shadow-sm animate-pulse">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    Sisa <?= $p['stock'] ?>
                                 </span>
                             </div>
-                            <div class="mt-3 space-y-1">
-                                <h2 class="text-sm font-semibold text-ls-ink line-clamp-2"><?= e($product['name']) ?></h2>
-                                <p class="text-xs text-ls-ink/60">
-                                    Stok: <?= (int) $product['stock'] ?> •
-                                    <?= $product['size_available'] ? 'Size: ' . e($product['size_available']) : 'Size all' ?>
-                                </p>
-                                <p class="text-sm font-semibold text-ls-pink"><?= format_rupiah((int) $product['price']) ?></p>
+                        <?php endif; ?>
+
+                        <div class="absolute inset-x-0 bottom-0 p-4 opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hidden md:block">
+                            <a href="product_detail.php?id=<?= $p['id'] ?>" class="block w-full py-3 bg-white/95 backdrop-blur text-gray-900 font-bold text-xs text-center rounded-xl hover:bg-ls-600 hover:text-white transition-colors shadow-lg uppercase tracking-wider">
+                                Lihat Detail
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="p-5 flex flex-col flex-1">
+                        <h3 class="font-bold text-gray-900 text-sm md:text-base leading-snug mb-1 line-clamp-2 group-hover:text-ls-600 transition-colors">
+                            <a href="product_detail.php?id=<?= $p['id'] ?>">
+                                <?= htmlspecialchars($p['name']) ?>
+                            </a>
+                        </h3>
+                        
+                        <div class="mt-auto pt-3 flex items-center justify-between">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Harga</span>
+                                <span class="text-ls-600 font-extrabold text-base md:text-lg">
+                                    Rp <?= number_format($p['price'], 0, ',', '.') ?>
+                                </span>
                             </div>
-                            <div class="mt-3 flex items-center justify-between gap-2">
-                                <a href="/ladystyle-shop/product_detail.php?id=<?= (int) $product['id'] ?>" class="inline-flex flex-1 items-center justify-center rounded-full bg-ls-pink px-3 py-1.5 text-xs font-semibold text-white shadow-md transition hover:bg-rose-500">
-                                    Lihat detail
-                                </a>
-                            </div>
-                        </article>
-                    <?php endforeach; ?>
+                            
+                            <a href="product_detail.php?id=<?= $p['id'] ?>" class="md:hidden w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-ls-600 hover:text-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                            </a>
+                        </div>
+                    </div>
                 </div>
-            <?php endif; ?>
-        </section>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+
     </main>
-</div>
+
+    <footer class="bg-white border-t border-gray-100 py-10 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <div class="w-12 h-12 bg-ls-100 text-ls-600 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-lg">LS</div>
+            <p class="text-gray-400 text-xs">&copy; <?= date('Y') ?> LadyStyle Shop. All rights reserved.</p>
+        </div>
+    </footer>
+
 </body>
 </html>
+'@

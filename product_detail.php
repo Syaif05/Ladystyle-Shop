@@ -1,242 +1,243 @@
 <?php // product_detail.php
 require __DIR__ . '/includes/config.php';
+require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
-if ($id <= 0) {
-    http_response_code(404);
-    echo 'Produk tidak ditemukan.';
-    exit;
-}
-
-$stmt = $pdo->prepare('SELECT p.*, c.name AS category_name FROM products p INNER JOIN categories c ON p.category_id = c.id WHERE p.id = :id AND p.status = "active"');
-$stmt->execute(['id' => $id]);
+$stmt = $pdo->prepare("SELECT p.*, c.name AS category_name FROM products p JOIN categories c ON p.category_id = c.id WHERE p.id = ?");
+$stmt->execute([$id]);
 $product = $stmt->fetch();
 
-if (!$product) {
-    http_response_code(404);
-    echo 'Produk tidak ditemukan.';
-    exit;
-}
+if (!$product) { echo "Produk tidak ditemukan"; exit; }
 
-$orderSuccess = '';
-$orderError = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $customerName = trim($_POST['customer_name'] ?? '');
-    $customerPhone = trim($_POST['customer_phone'] ?? '');
-    $customerAddress = trim($_POST['customer_address'] ?? '');
-    $size = trim($_POST['size'] ?? '');
-    $qty = (int) ($_POST['qty'] ?? 1);
-
-    if ($customerName === '' || $customerPhone === '' || $customerAddress === '' || $qty <= 0) {
-        $orderError = 'Nama, nomor WhatsApp, alamat, dan jumlah wajib diisi.';
-    } else {
-        $totalPrice = $product['price'] * $qty;
-        $orderCode = 'ORD-' . date('Ymd-His') . '-' . $product['id'];
-
-        $stmt = $pdo->prepare('INSERT INTO orders (order_code, product_id, customer_name, customer_phone, customer_address, size, qty, total_price, status) VALUES (:order_code, :product_id, :customer_name, :customer_phone, :customer_address, :size, :qty, :total_price, :status)');
-        $stmt->execute([
-            'order_code' => $orderCode,
-            'product_id' => $product['id'],
-            'customer_name' => $customerName,
-            'customer_phone' => $customerPhone,
-            'customer_address' => $customerAddress,
-            'size' => $size,
-            'qty' => $qty,
-            'total_price' => $totalPrice,
-            'status' => 'baru'
-        ]);
-
-        $orderSuccess = 'Pesanan berhasil dibuat dengan kode ' . $orderCode . '. Admin akan menghubungi kamu melalui WhatsApp.';
-    }
-}
+// Fetch Gallery (Gabungkan Main Image + Gallery untuk Slider)
+$sliderImages = [$product['image']]; 
+$stmtG = $pdo->prepare("SELECT image_url FROM product_gallery WHERE product_id = ?");
+$stmtG->execute([$id]);
+$galleryData = $stmtG->fetchAll(PDO::FETCH_COLUMN);
+$sliderImages = array_merge($sliderImages, $galleryData);
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <title><?= e($product['name']) ?> - LadyStyle Shop</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'ls-bg': '#fdf2f8',
-                        'ls-bg-soft': '#fee2f2',
-                        'ls-pink': '#fb7185',
-                        'ls-pink-soft': '#fecdd3',
-                        'ls-ink': '#0f172a'
-                    },
-                    boxShadow: {
-                        'ls-soft': '0 18px 45px rgba(251, 113, 133, 0.35)'
-                    },
-                    borderRadius: {
-                        '3xl': '1.75rem'
-                    }
-                }
-            }
-        };
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="/ladystyle-shop/assets/css/style.css" rel="stylesheet">
+    <title><?= htmlspecialchars($product['name']) ?> - LadyStyle</title>
+    <?php require __DIR__ . '/includes/head.php'; ?>
+    <style>
+        /* Custom Scrollbar Hide */
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Line Clamp Custom */
+        .line-clamp-custom {
+            display: -webkit-box;
+            -webkit-line-clamp: 4; /* Tampilkan 4 baris awal */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+        }
+        .expanded {
+            -webkit-line-clamp: unset;
+            mask-image: none;
+        }
+    </style>
 </head>
-<body class="min-h-screen bg-gradient-to-b from-white via-ls-bg-soft to-white text-ls-ink">
-<div class="relative overflow-hidden">
-    <div class="pointer-events-none absolute -top-40 -left-40 h-80 w-80 rounded-full bg-ls-bg blur-3xl opacity-70"></div>
-    <div class="pointer-events-none absolute -bottom-40 -right-32 h-96 w-96 rounded-full bg-ls-bg-soft blur-3xl opacity-80"></div>
+<body class="bg-gray-50 text-gray-800 font-sans">
+    <?php require __DIR__ . '/includes/navbar.php'; ?>
 
-    <header class="sticky top-0 z-20 bg-white/70 backdrop-blur-xl border-b border-pink-100/70">
-        <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-            <div class="flex items-center gap-2">
-                <div class="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-ls-pink to-rose-400 shadow-ls-soft">
-                    <span class="text-xs font-semibold tracking-widest text-white">LS</span>
-                </div>
-                <div class="leading-tight">
-                    <p class="text-sm font-semibold tracking-[0.18em] text-ls-ink/80 uppercase">LadyStyle</p>
-                    <p class="text-[11px] text-ls-ink/60">Soft & Modern Fashion Store</p>
-                </div>
-            </div>
-            <div class="hidden items-center gap-6 text-sm font-medium text-ls-ink/70 md:flex">
-                <a href="/ladystyle-shop/index.php" class="transition-colors hover:text-ls-pink">Beranda</a>
-                <a href="/ladystyle-shop/products.php" class="transition-colors hover:text-ls-pink">Koleksi</a>
-            </div>
-            <div class="flex items-center gap-2">
-                <a href="/ladystyle-shop/login.php" class="hidden rounded-full border border-pink-200 px-3 py-1.5 text-xs font-medium text-ls-ink/80 shadow-sm transition hover:border-ls-pink hover:bg-ls-pink-soft/50 md:inline-flex">
-                    Login Admin
-                </a>
-            </div>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 pb-24">
+        
+        <nav class="flex text-sm text-gray-500 mb-6">
+            <a href="index.php" class="hover:text-ls-600 transition">Beranda</a>
+            <span class="mx-2">/</span>
+            <a href="products.php" class="hover:text-ls-600 transition">Koleksi</a>
+            <span class="mx-2">/</span>
+            <span class="text-gray-900 font-medium truncate"><?= htmlspecialchars($product['name']) ?></span>
         </nav>
-    </header>
 
-    <main class="mx-auto max-w-6xl px-4 pb-16 pt-8">
-        <section class="grid gap-8 md:grid-cols-[1.1fr_1.1fr] md:items-start">
-            <div class="space-y-4">
-                <div class="rounded-3xl bg-white/90 p-3 shadow-md ring-1 ring-pink-100/80">
-                    <div class="overflow-hidden rounded-2xl bg-ls-bg-soft">
-                        <?php if ($product['image']): ?>
-                            <div class="h-72 w-full bg-cover bg-center sm:h-80" style="background-image:url('<?= e($product['image']) ?>');"></div>
-                        <?php else: ?>
-                            <div class="flex h-72 w-full items-center justify-center bg-[radial-gradient(circle_at_20%_20%,#fecdd3,#fee2e2)] text-sm font-medium text-ls-ink/60 sm:h-80">
-                                <?= e($product['category_name']) ?>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            
+            <div class="lg:col-span-8 space-y-10">
+                
+                <div class="space-y-4">
+                    <div class="relative group rounded-[2rem] overflow-hidden bg-white shadow-sm border border-gray-100">
+                        <div id="productSlider" class="flex overflow-x-auto hide-scroll snap-x snap-mandatory scroll-smooth w-full aspect-square">
+                            <?php foreach ($sliderImages as $idx => $img): ?>
+                            <div class="w-full flex-shrink-0 snap-center relative">
+                                <img src="<?= htmlspecialchars($img) ?>" class="w-full h-full object-cover" id="slide-<?= $idx ?>">
                             </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <div class="hidden rounded-3xl bg-white/90 p-4 text-xs text-ls-ink/70 shadow-md ring-1 ring-pink-100 md:block">
-                    <p class="font-semibold text-ls-ink/80">Catatan styling:</p>
-                    <p class="mt-1">
-                        Kamu bisa jelaskan di laporan bahwa halaman ini tidak hanya menampilkan data produk,
-                        tapi juga simulasi pengalaman belanja: lihat foto produk, info ukuran, warna, dan langsung pesan.
-                    </p>
-                </div>
-            </div>
-
-            <div class="space-y-5">
-                <div class="rounded-3xl bg-white/95 p-5 shadow-md ring-1 ring-pink-100/90">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <p class="text-xs font-semibold tracking-[0.22em] text-ls-pink uppercase">
-                                <?= e($product['category_name']) ?>
-                            </p>
-                            <h1 class="mt-1 text-xl font-semibold text-ls-ink sm:text-2xl">
-                                <?= e($product['name']) ?>
-                            </h1>
-                        </div>
-                        <div class="rounded-full bg-ls-bg-soft px-3 py-1 text-xs text-ls-ink/70">
-                            ID: <?= (int) $product['id'] ?>
-                        </div>
-                    </div>
-
-                    <p class="mt-3 text-lg font-semibold text-ls-pink">
-                        <?= format_rupiah((int) $product['price']) ?>
-                    </p>
-
-                    <div class="mt-2 flex flex-wrap gap-3 text-xs text-ls-ink/70">
-                        <span class="inline-flex items-center rounded-full bg-ls-bg-soft px-3 py-1">
-                            Stok: <?= (int) $product['stock'] ?>
-                        </span>
-                        <?php if ($product['size_available']): ?>
-                            <span class="inline-flex items-center rounded-full bg-ls-bg-soft px-3 py-1">
-                                Size: <?= e($product['size_available']) ?>
-                            </span>
-                        <?php endif; ?>
-                        <?php if ($product['color']): ?>
-                            <span class="inline-flex items-center rounded-full bg-ls-bg-soft px-3 py-1">
-                                Warna: <?= e($product['color']) ?>
-                            </span>
-                        <?php endif; ?>
-                    </div>
-
-                    <?php if ($product['description']): ?>
-                        <p class="mt-4 text-sm leading-relaxed text-ls-ink/80">
-                            <?= nl2br(e($product['description'])) ?>
-                        </p>
-                    <?php endif; ?>
-                </div>
-
-                <div class="rounded-3xl bg-white/95 p-5 shadow-md ring-1 ring-pink-100/90">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-sm font-semibold text-ls-ink sm:text-base">Form pemesanan</h2>
-                        <span class="rounded-full bg-ls-bg-soft px-3 py-1 text-[11px] font-medium text-ls-pink">
-                            Pesanan dikirim ke admin
-                        </span>
-                    </div>
-
-                    <?php if ($orderError !== ''): ?>
-                        <div class="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-xs text-red-700 border border-red-100">
-                            <?= e($orderError) ?>
-                        </div>
-                    <?php endif; ?>
-                    <?php if ($orderSuccess !== ''): ?>
-                        <div class="mt-3 rounded-2xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 border border-emerald-100">
-                            <?= e($orderSuccess) ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <form method="post" class="mt-4 space-y-3 text-sm">
-                        <div>
-                            <label for="customer_name" class="mb-1 block text-xs font-medium text-ls-ink/80">Nama lengkap</label>
-                            <input id="customer_name" name="customer_name" type="text" required
-                                   class="w-full rounded-2xl border border-pink-100 bg-white/90 px-3 py-2 text-sm text-ls-ink shadow-sm outline-none ring-0 transition focus:border-ls-pink focus:ring-2 focus:ring-ls-pink-soft">
+                            <?php endforeach; ?>
                         </div>
 
-                        <div>
-                            <label for="customer_phone" class="mb-1 block text-xs font-medium text-ls-ink/80">No. WhatsApp</label>
-                            <input id="customer_phone" name="customer_phone" type="text" required
-                                   class="w-full rounded-2xl border border-pink-100 bg-white/90 px-3 py-2 text-sm text-ls-ink shadow-sm outline-none ring-0 transition focus:border-ls-pink focus:ring-2 focus:ring-ls-pink-soft">
-                        </div>
-
-                        <div>
-                            <label for="customer_address" class="mb-1 block text-xs font-medium text-ls-ink/80">Alamat lengkap</label>
-                            <textarea id="customer_address" name="customer_address" rows="3" required
-                                      class="w-full rounded-2xl border border-pink-100 bg-white/90 px-3 py-2 text-sm text-ls-ink shadow-sm outline-none ring-0 transition focus:border-ls-pink focus:ring-2 focus:ring-ls-pink-soft"></textarea>
-                        </div>
-
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <div>
-                                <label for="size" class="mb-1 block text-xs font-medium text-ls-ink/80">Ukuran (opsional)</label>
-                                <input id="size" name="size" type="text" placeholder="Contoh: M"
-                                       class="w-full rounded-2xl border border-pink-100 bg-white/90 px-3 py-2 text-sm text-ls-ink shadow-sm outline-none ring-0 transition focus:border-ls-pink focus:ring-2 focus:ring-ls-pink-soft">
-                            </div>
-                            <div>
-                                <label for="qty" class="mb-1 block text-xs font-medium text-ls-ink/80">Jumlah</label>
-                                <input id="qty" name="qty" type="number" min="1" value="1" required
-                                       class="w-full rounded-2xl border border-pink-100 bg-white/90 px-3 py-2 text-sm text-ls-ink shadow-sm outline-none ring-0 transition focus:border-ls-pink focus:ring-2 focus:ring-ls-pink-soft">
-                            </div>
-                        </div>
-
-                        <button type="submit" class="mt-2 inline-flex w-full items-center justify-center rounded-full bg-ls-pink px-4 py-2.5 text-sm font-semibold text-white shadow-ls-soft transition hover:bg-rose-500 active:scale-95">
-                            Kirim pesanan
+                        <?php if(count($sliderImages) > 1): ?>
+                        <button onclick="scrollSlider(-1)" class="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 backdrop-blur rounded-full flex items-center justify-center text-gray-800 hover:bg-white shadow-lg transition opacity-0 group-hover:opacity-100">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         </button>
-                    </form>
+                        <button onclick="scrollSlider(1)" class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 backdrop-blur rounded-full flex items-center justify-center text-gray-800 hover:bg-white shadow-lg transition opacity-0 group-hover:opacity-100">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                        <?php endif; ?>
+
+                        <div class="absolute top-4 left-4 flex gap-2">
+                            <span class="px-3 py-1 rounded-full bg-white/90 backdrop-blur text-xs font-bold text-gray-800 shadow-sm uppercase tracking-wider">
+                                <?= htmlspecialchars($product['category_name']) ?>
+                            </span>
+                            <?php if ($product['stock'] < 5): ?>
+                                <span class="px-3 py-1 rounded-full bg-red-500/90 backdrop-blur text-xs font-bold text-white shadow-sm animate-pulse">
+                                    Sisa <?= $product['stock'] ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <?php if(count($sliderImages) > 1): ?>
+                    <div class="flex gap-3 overflow-x-auto hide-scroll pb-2">
+                        <?php foreach ($sliderImages as $idx => $img): ?>
+                        <button onclick="goToSlide(<?= $idx ?>)" class="relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-transparent hover:border-ls-400 focus:border-ls-600 transition-all">
+                            <img src="<?= htmlspecialchars($img) ?>" class="w-full h-full object-cover">
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="glass-panel p-8 rounded-3xl border-t-4 border-ls-500">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-ls-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                        Detail & Spesifikasi
+                    </h3>
+                    
+                    <div class="relative">
+                        <div id="descContent" class="text-gray-600 leading-relaxed whitespace-pre-line text-sm md:text-base line-clamp-custom transition-all duration-500">
+                            <?= htmlspecialchars($product['description']) ?>
+                        </div>
+                        
+                        <div class="mt-4 text-center">
+                            <button id="toggleDescBtn" onclick="toggleDescription()" class="inline-flex items-center gap-2 text-sm font-bold text-ls-600 hover:text-ls-800 transition">
+                                <span>Lihat Selengkapnya</span>
+                                <svg id="toggleIcon" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="lg:col-span-4 relative">
+                <div class="sticky top-24 space-y-6">
+                    
+                    <div class="bg-white p-6 rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100">
+                        <h1 class="text-2xl font-bold text-gray-900 leading-tight mb-2"><?= htmlspecialchars($product['name']) ?></h1>
+                        
+                        <div class="flex items-end gap-2 mb-6 pb-6 border-b border-gray-100">
+                            <span class="text-3xl font-extrabold text-ls-600">Rp <?= number_format($product['price'], 0, ',', '.') ?></span>
+                        </div>
+
+                        <form action="checkout.php" method="GET" class="space-y-6">
+                            <input type="hidden" name="id" value="<?= $product['id'] ?>">
+                            
+                            <div>
+                                <label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Pilih Ukuran</label>
+                                <div class="flex flex-wrap gap-2">
+                                    <?php 
+                                    $sizes = explode(',', $product['size_available'] ?: 'All Size');
+                                    foreach($sizes as $idx => $size): 
+                                    ?>
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="size" class="peer sr-only" value="<?= trim($size) ?>" <?= $idx===0 ? 'checked' : '' ?>>
+                                            <div class="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 peer-checked:bg-gray-900 peer-checked:text-white peer-checked:border-gray-900 transition hover:border-gray-400">
+                                                <?= trim($size) ?>
+                                            </div>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Jumlah Barang</label>
+                                <div class="flex items-center justify-between bg-gray-50 rounded-2xl p-1 border border-gray-200">
+                                    <button type="button" onclick="updateQty(-1)" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-gray-600 shadow-sm hover:text-red-500 transition font-bold text-lg">-</button>
+                                    <input type="number" name="qty" id="qtyInput" value="1" min="1" max="<?= $product['stock'] ?>" class="w-16 text-center bg-transparent border-none focus:ring-0 font-bold text-gray-900 text-lg" readonly>
+                                    <button type="button" onclick="updateQty(1)" class="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-gray-600 shadow-sm hover:text-green-500 transition font-bold text-lg">+</button>
+                                </div>
+                                <p class="text-xs text-gray-400 mt-2 text-right">Stok tersedia: <?= $product['stock'] ?></p>
+                            </div>
+
+                            <div class="pt-2">
+                                <?php if ($product['stock'] > 0): ?>
+                                    <button type="submit" class="w-full py-4 rounded-xl bg-gradient-to-r from-ls-500 to-ls-600 text-white font-bold text-lg shadow-lg shadow-ls-500/40 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2">
+                                        Pesan Sekarang
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                                    </button>
+                                <?php else: ?>
+                                    <button type="button" disabled class="w-full py-4 rounded-xl bg-gray-200 text-gray-400 font-bold text-lg cursor-not-allowed">
+                                        Stok Habis
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-2xl grid grid-cols-2 gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <span class="text-xs font-bold text-gray-600">Garansi Original</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
+                            <span class="text-xs font-bold text-gray-600">Kirim Cepat</span>
+                        </div>
+                    </div>
+
                 </div>
             </div>
-        </section>
+
+        </div>
     </main>
-</div>
+
+    <script>
+        // --- Slider Logic ---
+        function scrollSlider(direction) {
+            const container = document.getElementById('productSlider');
+            const scrollAmount = container.offsetWidth;
+            container.scrollBy({ left: scrollAmount * direction, behavior: 'smooth' });
+        }
+
+        function goToSlide(index) {
+            const container = document.getElementById('productSlider');
+            const scrollAmount = container.offsetWidth;
+            container.scrollTo({ left: scrollAmount * index, behavior: 'smooth' });
+        }
+
+        // --- Description Toggle ---
+        function toggleDescription() {
+            const content = document.getElementById('descContent');
+            const btnText = document.querySelector('#toggleDescBtn span');
+            const icon = document.getElementById('toggleIcon');
+            
+            content.classList.toggle('expanded');
+            content.classList.toggle('line-clamp-custom');
+            
+            if (content.classList.contains('expanded')) {
+                btnText.innerText = "Tutup Deskripsi";
+                icon.style.transform = "rotate(180deg)";
+            } else {
+                btnText.innerText = "Lihat Selengkapnya";
+                icon.style.transform = "rotate(0deg)";
+            }
+        }
+
+        // --- Quantity Logic ---
+        function updateQty(change) {
+            const input = document.getElementById('qtyInput');
+            let val = parseInt(input.value) + change;
+            if (val < 1) val = 1;
+            if (val > <?= $product['stock'] ?>) val = <?= $product['stock'] ?>;
+            input.value = val;
+        }
+    </script>
 </body>
 </html>

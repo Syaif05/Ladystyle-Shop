@@ -4,154 +4,111 @@ require __DIR__ . '/../includes/auth.php';
 require __DIR__ . '/../includes/functions.php';
 
 require_login();
+$message = '';
 
-$error = '';
-$success = '';
-
+// Handle POST Request
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
 
-    if ($name === '') {
-        $error = 'Nama kategori wajib diisi.';
-    } else {
+    if ($name) {
         if ($id > 0) {
             $stmt = $pdo->prepare('UPDATE categories SET name = :name WHERE id = :id');
-            $stmt->execute([
-                'name' => $name,
-                'id' => $id
-            ]);
-            $success = 'Kategori berhasil diperbarui.';
+            $stmt->execute(['name' => $name, 'id' => $id]);
+            $message = 'Kategori berhasil diperbarui.';
         } else {
             $stmt = $pdo->prepare('INSERT INTO categories (name) VALUES (:name)');
             $stmt->execute(['name' => $name]);
-            $success = 'Kategori baru berhasil ditambahkan.';
+            $message = 'Kategori baru ditambahkan.';
         }
     }
 }
 
+// Handle Delete & Edit
 if (isset($_GET['delete'])) {
-    $deleteId = (int) $_GET['delete'];
-    if ($deleteId > 0) {
-        $stmt = $pdo->prepare('DELETE FROM categories WHERE id = :id');
-        $stmt->execute(['id' => $deleteId]);
-        $success = 'Kategori berhasil dihapus.';
-    }
+    $stmt = $pdo->prepare('DELETE FROM categories WHERE id = :id');
+    $stmt->execute(['id' => (int)$_GET['delete']]);
+    $message = 'Kategori dihapus.';
 }
 
 $editCategory = null;
 if (isset($_GET['edit'])) {
-    $editId = (int) $_GET['edit'];
-    if ($editId > 0) {
-        $stmt = $pdo->prepare('SELECT * FROM categories WHERE id = :id');
-        $stmt->execute(['id' => $editId]);
-        $editCategory = $stmt->fetch();
-    }
+    $stmt = $pdo->prepare('SELECT * FROM categories WHERE id = :id');
+    $stmt->execute(['id' => (int)$_GET['edit']]);
+    $editCategory = $stmt->fetch();
 }
 
-$stmt = $pdo->query('SELECT * FROM categories ORDER BY id DESC');
-$categories = $stmt->fetchAll();
+$categories = $pdo->query('SELECT * FROM categories ORDER BY id DESC')->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <title>Manajemen Kategori - LadyStyle Shop</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/ladystyle-shop/assets/css/style.css" rel="stylesheet">
+    <title>Kategori - LadyStyle Admin</title>
+    <?php require __DIR__ . '/../includes/head.php'; ?>
 </head>
-<body class="app-body">
-<div class="dashboard-layout">
-    <aside class="sidebar">
-        <div class="sidebar-brand">
-            <span class="brand-mark">LS</span>
-            <span class="brand-text">LadyStyle</span>
-        </div>
-        <nav class="sidebar-nav">
-            <a href="/ladystyle-shop/dashboard/index.php" class="nav-link">Dashboard</a>
-            <a href="/ladystyle-shop/dashboard/products.php" class="nav-link">Produk</a>
-            <a href="/ladystyle-shop/dashboard/categories.php" class="nav-link nav-link-active">Kategori</a>
-            <a href="/ladystyle-shop/dashboard/orders.php" class="nav-link">Pesanan</a>
-            <a href="/ladystyle-shop/dashboard/reports.php" class="nav-link">Laporan</a>
-        </nav>
-        <a href="/ladystyle-shop/logout.php" class="nav-link nav-link-danger">Keluar</a>
-    </aside>
-    <main class="dashboard-main">
-        <header class="dashboard-header">
-            <h1 class="page-title">Manajemen Kategori</h1>
-            <div class="user-pill">
-                <span class="user-avatar"><?= strtoupper(($_SESSION['user_name'] ?? 'A')[0]) ?></span>
-                <span class="user-name"><?= e($_SESSION['user_name'] ?? 'Admin') ?></span>
-            </div>
-        </header>
+<body class="bg-gray-50/50">
+    <div class="flex h-screen overflow-hidden">
+        <?php require __DIR__ . '/../includes/sidebar.php'; ?>
 
-        <section class="dashboard-content">
-            <div class="stats-grid">
-                <div class="glass-card stats-card">
-                    <h2 class="stats-label"><?= $editCategory ? 'Edit Kategori' : 'Tambah Kategori Baru' ?></h2>
-                    <form method="post" class="form-vertical mt-2">
-                        <input type="hidden" name="id" value="<?= $editCategory['id'] ?? 0 ?>">
-                        <label class="form-label" for="name">Nama Kategori</label>
-                        <input
-                            id="name"
-                            type="text"
-                            name="name"
-                            class="input-control"
-                            value="<?= e($editCategory['name'] ?? '') ?>"
-                            required
-                        >
-                        <button type="submit" class="btn-primary mt-3">
-                            Simpan
-                        </button>
-                    </form>
-                    <?php if ($error !== ''): ?>
-                        <p class="helper-text mt-2" style="color:#fecaca;"><?= e($error) ?></p>
-                    <?php endif; ?>
-                    <?php if ($success !== ''): ?>
-                        <p class="helper-text mt-2" style="color:#bbf7d0;"><?= e($success) ?></p>
-                    <?php endif; ?>
-                </div>
-            </div>
+        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50/50 p-6 md:p-12">
+            <div class="max-w-5xl mx-auto">
+                <header class="mb-8">
+                    <h1 class="text-3xl font-bold text-gray-900">Kategori Produk</h1>
+                </header>
 
-            <div class="stats-grid">
-                <div class="glass-card stats-card">
-                    <h2 class="stats-label">Daftar Kategori</h2>
-                    <div class="table-wrapper">
-                        <table class="data-table">
-                            <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nama Kategori</th>
-                                <th>Dibuat</th>
-                                <th>Aksi</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <?php if (count($categories) === 0): ?>
-                                <tr>
-                                    <td colspan="4">Belum ada kategori.</td>
-                                </tr>
-                            <?php else: ?>
-                                <?php foreach ($categories as $category): ?>
-                                    <tr>
-                                        <td><?= (int) $category['id'] ?></td>
-                                        <td><?= e($category['name']) ?></td>
-                                        <td><?= e($category['created_at']) ?></td>
-                                        <td>
-                                            <a href="/ladystyle-shop/dashboard/categories.php?edit=<?= (int) $category['id'] ?>" class="table-action">Edit</a>
-                                            <a href="/ladystyle-shop/dashboard/categories.php?delete=<?= (int) $category['id'] ?>" class="table-action table-action-danger" onclick="return confirm('Yakin ingin menghapus kategori ini?')">Hapus</a>
+                <?php if ($message): ?>
+                    <div class="bg-green-50 text-green-700 px-4 py-3 rounded-xl mb-6 border border-green-100 text-sm font-medium">
+                        <?= htmlspecialchars($message) ?>
+                    </div>
+                <?php endif; ?>
+
+                <div class="grid md:grid-cols-[1fr_1.5fr] gap-8">
+                    <div class="glass-panel p-6 rounded-3xl h-fit">
+                        <h2 class="text-lg font-bold text-gray-800 mb-4"><?= $editCategory ? 'Edit Kategori' : 'Tambah Kategori' ?></h2>
+                        <form method="post" class="space-y-4">
+                            <input type="hidden" name="id" value="<?= $editCategory['id'] ?? 0 ?>">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Nama Kategori</label>
+                                <input type="text" name="name" value="<?= htmlspecialchars($editCategory['name'] ?? '') ?>" required
+                                       class="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 focus:ring-2 focus:ring-ls-200 outline-none transition">
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="submit" class="flex-1 bg-gray-900 text-white py-3 rounded-xl font-medium hover:bg-ls-600 transition">Simpan</button>
+                                <?php if ($editCategory): ?>
+                                    <a href="categories.php" class="px-4 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Batal</a>
+                                <?php endif; ?>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel p-6 rounded-3xl">
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="text-left border-b border-gray-100">
+                                        <th class="pb-3 text-xs font-bold text-gray-400 uppercase">ID</th>
+                                        <th class="pb-3 text-xs font-bold text-gray-400 uppercase">Nama</th>
+                                        <th class="pb-3 text-xs font-bold text-gray-400 uppercase text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-sm">
+                                    <?php foreach ($categories as $cat): ?>
+                                    <tr class="group hover:bg-gray-50/50 transition">
+                                        <td class="py-4 text-gray-400">#<?= $cat['id'] ?></td>
+                                        <td class="py-4 font-medium text-gray-700"><?= htmlspecialchars($cat['name']) ?></td>
+                                        <td class="py-4 flex justify-end gap-2">
+                                            <a href="?edit=<?= $cat['id'] ?>" class="p-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition">Edit</a>
+                                            <a href="?delete=<?= $cat['id'] ?>" onclick="return confirm('Hapus?')" class="p-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</a>
                                         </td>
                                     </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                            </tbody>
-                        </table>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
-        </section>
-    </main>
-</div>
-<script src="/ladystyle-shop/assets/js/app.js"></script>
+        </main>
+    </div>
 </body>
 </html>
